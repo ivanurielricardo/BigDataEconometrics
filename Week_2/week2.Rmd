@@ -1,0 +1,291 @@
+---
+title: "Continuing the Lasso"
+author: "Ivan"
+date: "2/13/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1
+
+### Part a
+
+**Yes** we can in fact use the lasso for classification problems. Say we are trying to find out whether an email is spam or not. The number of regressors may still in fact be large, so the lasso can help us distinguish which of these regressors contribute to classifying an email as spam or not
+
+### Part b
+
+For large values of $\lambda$, the AL actually choses **less** variables than the lasso. In other words, if you penalize more in the lasso, the AL will penalize less. Will be more robust when your initial selection is large.
+
+### Part c
+
+First, what is **Least Angle Regression**? Least Angle Regression (LARS) is a class of techniques for solving the lasso. Produce the entire path of solutions in a sequential (step-wise) manner as a piecewise linear path.
+
+Delivers the entire solution path as a function of $\lambda$. It is efficient, but does not scale up to larger problems. Another way of looking at it is as a "democratic" forward stepwise regression. 
+
+LARS is a greedy algorithm that does not yield a provably consistent estimator. Conversely, the LASSO (and thus the LARS algorithm when used in LASSO mode) solves a convex data fitting problem. 
+
+### Part d
+
+Coordinate descent actually allows for upper and lower bounds on each coefficient and also allows for efficient computation. It is the workhorse algorithm in glmnet and is a simple extension from the lasso thus it can be used for the elastic net. 
+
+LARS is proposed in the paper by Zou and Hastie. If we fix the ridge regularizer, we essentially have a lasso on an augmented dataset and LARS works well. 
+
+The way this is done is by writing the EN as a lasso problem. This is shown in the slides. The same can be done for AL, where the weight is given in the penalty function. We essentially rescale all the variables by the weight. Dividing all by two means the parameter is multiplied by 2.
+
+## Question 2
+
+### Part a
+$$y_i = \beta_1 x_{i,1} + \beta_2 x_{i,2} + \varepsilon_i, \quad i = 1, \dots, n$$
+We look at the group lasso penalty and compare it to the lasso and ridge penalties
+$$||\mathbf \beta||_2 = \left(\sum_{j=1}^k |\beta_j|^2\right)^{1/2}, \quad ||\mathbf{\beta}||_1 = \sum_{j=1}^k |\beta_j|, \quad ||\mathbf{\beta}||_2^2 = \sum_{j=1}^k \beta_j^2$$
+For the group lasso, we consider $j$ groups of covariates, can be denoted $\theta_j$. The group lasso solves
+$$\underset{\theta_j}{\arg\min} \left(||\mathbf{y} - \mathbf{X} \theta_j||_2^2/n + \lambda ||\theta_j||_2\right)$$
+
+- Depending on $\lambda$, either the entire vector $\hat \theta_j$ is zero or all its elements will be nonzero
+- If all groups are singletons, then this reduces to the normal lasso
+- If we have one group, then this reduces to the ridge regression
+- We consider only coefficients in group $j$, and all of these covariates are equally penalized
+- The group penalty comes from the fact we square root **all** of the variables at once
+- This applies only to the j^th group
+
+```{r group lasso, echo=FALSE, out.width = '80%', fig.align = "center"}
+knitr::include_graphics("/Users/Ivan/Desktop/Areas/UM/CLASSES/YEAR_2/period_4/BIg_Data/Lasso_cont/group_lasso.png")
+```
+
+### Part b
+
+```{r FOC group, echo=FALSE, out.width = '80%', fig.align = "center"}
+knitr::include_graphics("/Users/Ivan/Desktop/Areas/UM/CLASSES/YEAR_2/period_4/BIg_Data/Lasso_cont/week2_2b.jpeg")
+```
+
+### Part c
+
+```{r equivalence group, echo=FALSE, out.width = '80%', fig.align = "center"}
+knitr::include_graphics("/Users/Ivan/Desktop/Areas/UM/CLASSES/YEAR_2/period_4/BIg_Data/Lasso_cont/week2_2c.jpeg")
+```
+
+### Part d
+
+```{r not equals zero case, echo=FALSE, out.width = '80%', fig.align = "center"}
+knitr::include_graphics("/Users/Ivan/Desktop/Areas/UM/CLASSES/YEAR_2/period_4/BIg_Data/Lasso_cont/week2_2d.jpeg")
+```
+
+### Part e
+
+```{r combining cases, echo=FALSE, out.width = '80%', fig.align = "center"}
+knitr::include_graphics("/Users/Ivan/Desktop/Areas/UM/CLASSES/YEAR_2/period_4/BIg_Data/Lasso_cont/week2_2e.jpeg")
+```
+
+### Part f
+
+```{r probability, echo=FALSE, out.width = '80%', fig.align = "center"}
+knitr::include_graphics("/Users/Ivan/Desktop/Areas/UM/CLASSES/YEAR_2/period_4/BIg_Data/Lasso_cont/week2_2f.jpeg")
+```
+
+### Part g
+
+```{r consistency, echo=FALSE, out.width = '80%', fig.align = "center"}
+knitr::include_graphics("/Users/Ivan/Desktop/Areas/UM/CLASSES/YEAR_2/period_4/BIg_Data/Lasso_cont/week2_2g.jpeg")
+```
+
+In this case, we need to note that the first case should be $n$ and not $\sqrt{n}$. In the second case, we note that because we are dividing by $\sqrt{n}$ for the chi-square and by $n$ for the normal distribution, the normal distribution takes over the chi square distribution. In this case, we simply need that it goes to negative infinity, which is what we have. 
+
+## Question 3
+
+```{r data, message=FALSE, warning=FALSE}
+set.seed(20230215)
+load("/Users/Ivan/Desktop/Areas/UM/CLASSES/YEAR_2/period_4/BIg_Data/Lasso_cont/Arctic_Ice.RData")
+library(zoo)
+library(vars)
+library(bigtime)
+library(tseries)
+
+plot(Arctic_Ice)
+```
+
+None of the time series look stationary, but we can perform unit tests to verify this.
+
+```{r adf tests, warning=FALSE}
+adf_test <- function(x) {
+  return(adf.test(x)$p.value)
+}
+adf.results <- sapply(Arctic_Ice, adf_test)  # Applies the function adf_test to each column
+adf.results
+
+stat.Arctic <- as.zoo(sapply(Arctic_Ice,diff))
+adf.results2 <- sapply(stat.Arctic, adf_test)
+adf.results2
+
+ts.plot(stat.Arctic[,1], col = 2)
+lines(stat.Arctic[,2], col = 3)
+lines(stat.Arctic[,3], col = 4)
+lines(stat.Arctic[,4], col = 5)
+lines(stat.Arctic[,5], col = 6)
+legend("bottomleft",                          
+       c("SIE", "AirTemp", "SeaTemp", "CO2", "EconAct"),
+       lty = 1,
+       col = 2:6)
+```
+
+Interesting that the null for CO2 is not rejected. Could be the case that it is trend stationary. But it seems (suspiciously enough) that all our series are stationary with the exception of `CO2`.  Therefore, we use the "both" type option when estimating the VAR. We also select the number of lags using the `VARselect` function. In the end, this is not important because we are not performing inference for the VAR. Forecasting longer term is also not recommended with series in levels (But maybe more of a dimensionality problem). 
+
+```{r VAR select}
+VARselect(Arctic_Ice,type = c("both"))$selection
+VARselect(stat.Arctic,type = c("both"))$selection
+```
+AIC chooses 6 lags which results in a high dimensional model with $5\times5\times6 = 150$ parameters to estimate. I also include both trend and intercept terms. Additionally, I estimate using the stationary values.
+
+```{r VAR estimate}
+VAR.estimate <- VAR(Arctic_Ice, p = 6, type = c("both"))
+summary(VAR.estimate)
+VAR.stat.estimate <- VAR(stat.Arctic, p = 9, type = c("none"))
+summary(VAR.stat.estimate)
+```
+
+### In Levels
+
+It seems the most important variable to explain SIE is the lag term, but other variables make little to no impact. Perhaps air temp and economic activity help explain the current SIE slightly, but it is a marginal impact. 
+
+Other interesting thing to note is that CO2 emissions can be predicted quite well by the lag terms. This is because of the strong linear trend it exhibits from the plot above. 
+
+Additionally, we take 6 lags, as recommended by AIC.
+
+### First Differences
+
+In this case, we find more relevance in the lag terms to explain SIE. Additionally, Air temp, Sea temp, and CO2 emission seem strong candidates for helping predict SIE. 
+
+Other variables look to be better explained other than econ activity, which is not affected by the other response variables. 
+
+We take 9 lags in this case, as recommended by AIC.
+
+### Penalized Regressions
+
+The problem with this approach is we will almost certainly overfit the data and with an R^2 of 0.9993, We seem to explain a lot of the variance of the dataset given the amount of parameters we have. The solution here would then be penalized regression. We use the `bigtime` package with the `L1` penalty option to impose a lasso penalty to the VAR estimates of the time series in levels and differenced. 
+
+```{r Penalized VAR levels, warning=FALSE}
+sparse.VAR.estimate <- sparseVAR(scale(Arctic_Ice), VARpen = "L1", selection = "cv")
+sparse.VAR.estimate$Phihat
+Phihat.viz <- lagmatrix(fit=sparse.VAR.estimate, returnplot=TRUE)
+```
+
+Here, the 5 rows each represent the response variables. We can see we can actually account for much longer time series here, with 34 lags being selected for each response. The heatmap shows that SIE is affected for 34 months from all regressors except AirTemp. We can do the same to the differenced dataset.
+
+```{r Penalized diff VAR levels, warning=FALSE}
+sparse.diff.VAR.estimate <- sparseVAR(scale(stat.Arctic), VARpen = "L1", selection = "bic")
+sparse.diff.VAR.estimate$Phihat
+Phihat.diff.viz <- lagmatrix(fit=sparse.diff.VAR.estimate, returnplot=TRUE)
+```
+
+Here, we see that we get much different results, and actually see that SIE is affected by 24 lags of itself, and also by the SeaTemp for 11 lags. Note for cv we actually obtain zeros for all coefficient lags. Any reason why?
+
+### Forecasting
+
+We can use our model in levels for forecasting to avoid any complications with returning a differenced series back to levels. Although the SIE level has already reached 0, we can see it is going down once again with the SIE reaching a level of 1.406 in June of 2022 and 1.226 in July 2022. We will compare this to forecast from a normal VAR with p = 6 lags.
+
+```{r forecasting}
+Y <- Arctic_Ice[-nrow(Arctic_Ice),]  # Leave the last 10 observations out for comparison
+Ytest <- Arctic_Ice[nrow(Arctic_Ice),]
+
+VARcv <- sparseVAR(Y = scale(Y), VARpen = "L1", selection = "cv", h = 1)
+
+VARf <- directforecast(VARcv, h = 1)
+mean((VARf-Ytest)^2)
+
+# Longer horizon forecasting
+is.stable(VARcv)
+rec_fcst <- recursiveforecast(VARcv, h = 100)
+plot(rec_fcst, series = "SIE")
+```
+
+Here, we note that SIE is on the rise, and this is captured by the forecast. We can compare this to the forecast for the regular VAR.
+
+```{r normal forecasting}
+library(forecast)
+VARnormf <- VAR(Arctic_Ice, p = 6, type = c("both"))
+fcst <- predict(VARnormf, n.ahead = 100)
+plot(fcst$fcst$SIE[,1])
+```
+
+Here, we actually go down in forecast interestingly enough. We can compare the two models using cross validation
+
+### Penalized VAR Implementation
+
+We create a function that implements a penalized VAR. Note we assume that the data is all standardized and centered around zero
+```{r Penalized VAR Implementation}
+# Soft Thresholding
+soft.thresh <- function(x, lambda){
+  sign(x) * pmax(abs(x) - lambda, 0)
+}
+
+# Stopping Criteria: verify that average loss hasn't changed more than tol
+# k is the iteration
+# window used to find window length
+# patience is further down, used to see how many time points to consider for loss
+should.stop <- function(loss, window, k, tol = 1e-10) {
+  window_length = floor(window / 2) - 1
+  prev_loss <- mean(loss[(k-(window-1)):(k-(window-1)+window_length)])
+  curr_loss <- mean(loss[(k-(window-1)+window_length):k])
+
+  abs(curr_loss - prev_loss) < tol
+}
+
+# Coordinate Descent
+coord.desc <- function(y, X, lambda, max.iter = 500, tol = 1e-4, patience = 10){
+  X <- scale(X)
+  y <- scale(y)
+  beta.hat <- rep(0,ncol(X))
+  
+  # Value of loss function at each iteration
+  loss <- rep(0, max.iter)
+  
+  for (k in 1:max.iter){
+    # The full residual used to check the value of the loss function
+    residual <- y - X %*% beta.hat
+    loss[k] <- mean(residual*residual)
+    
+    for (j in 1:ncol(X)){
+      # Partial residual (effect on all other covariates)
+      residual <- residual + X[,j] * beta.hat[j]
+      
+      # Single variable OLS estimate
+      beta.ols.j <- mean(residual * X[,j])
+      
+      # Soft thresholding
+      beta.hat[j] <- soft.thresh(beta.ols.j, lambda)
+    }
+    
+    # Early Stopping Criteria
+    if (k>patience){
+      if (should.stop(loss, k = k, window = patience, tol = tol)) {
+        break
+      }
+    }
+  }
+  beta.hat
+}
+
+penal.VAR <- function(Y, VARp = 1, lambda = 0, max.iter = 500, tol = 1e-4){
+  k <- ncol(Y)
+  lagged.Y <- embed(Y, VARp+1)[,-(1:k)]  # Long parameter matrix of all lags from t through VARp
+  original.Y <- embed(Y,VARp+1)[,1:k]
+  
+  # Best way of doing this is row by row?
+  # Perform coordinate descent on each output variable independently
+  
+  beta.hat <- matrix(data = NA, nrow = k, ncol = k*VARp)
+  for (series in 1:k){
+    beta.hat[series,] <- coord.desc(original.Y[,series], lagged.Y, lambda = lambda)
+  }
+  array(beta.hat, dim = c(k,k,VARp))
+}
+
+penal.VAR(Arctic_Ice, VARp = 9, lambda = 0.05)
+penal.VAR(stat.Arctic, VARp = 9, lambda = 0.05)
+sparseVAR(scale(stat.Arctic), p = 9, VARpen = "L1", VARlseq = 0.5)$Phihat
+```
+In the end, we will have 5 rows and $5 \times$VARp columns
+
+
